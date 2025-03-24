@@ -1,0 +1,190 @@
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  runApp(BMICalculatorApp());
+}
+
+class BMICalculatorApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'BMI Calculator',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        brightness: Brightness.light,
+      ),
+      darkTheme: ThemeData(
+        primarySwatch: Colors.blue,
+        brightness: Brightness.dark,
+      ),
+      themeMode: ThemeMode.system,
+      home: BMICalculator(),
+    );
+  }
+}
+
+class BMICalculator extends StatefulWidget {
+  @override
+  _BMICalculatorState createState() => _BMICalculatorState();
+}
+
+class _BMICalculatorState extends State<BMICalculator> {
+  final TextEditingController _weightController = TextEditingController();
+  final TextEditingController _heightController = TextEditingController();
+  String _result = '';
+  List<String> _history = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  void _loadHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _history = prefs.getStringList('bmi_history') ?? [];
+    });
+  }
+
+  void _saveToHistory(String result) async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _history.add(result);
+      prefs.setStringList('bmi_history', _history);
+    });
+  }
+
+  void _calculateBMI() {
+    final double weight = double.tryParse(_weightController.text) ?? 0;
+    final double height = double.tryParse(_heightController.text) ?? 0;
+
+    if (weight > 0 && height > 0) {
+      final double bmi = weight / (height * height);
+      String result = 'Your BMI is ${bmi.toStringAsFixed(2)}\n';
+      if (bmi < 18.5) {
+        result += 'You are underweight.';
+      } else if (bmi >= 18.5 && bmi < 24.9) {
+        result += 'You have a normal weight.';
+      } else if (bmi >= 25 && bmi < 29.9) {
+        result += 'You are overweight.';
+      } else {
+        result += 'You are obese.';
+      }
+      setState(() {
+        _result = result;
+        _saveToHistory(result);
+      });
+    } else {
+      setState(() {
+        _result = 'Please enter valid values for weight and height.';
+      });
+    }
+  }
+
+  void _clearHistory() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _history.clear();
+      prefs.remove('bmi_history');
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('BMI Calculator'),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.history),
+            onPressed: () => _showHistory(context),
+          ),
+          IconButton(
+            icon: Icon(Icons.brightness_6),
+            onPressed: () {
+              setState(() {
+                ThemeMode currentMode = Theme.of(context).brightness == Brightness.dark
+                    ? ThemeMode.light
+                    : ThemeMode.dark;
+                currentMode = currentMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+              });
+            },
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _weightController,
+              decoration: InputDecoration(
+                labelText: 'Weight (kg)',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            TextField(
+              controller: _heightController,
+              decoration: InputDecoration(
+                labelText: 'Height (m)',
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: _calculateBMI,
+              child: Text('Calculate BMI'),
+            ),
+            SizedBox(height: 20),
+            Text(
+              _result,
+              style: TextStyle(fontSize: 18),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showHistory(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text('BMI History'),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: _history.length,
+              itemBuilder: (BuildContext context, int index) {
+                return ListTile(
+                  title: Text(_history[index]),
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _clearHistory();
+                Navigator.of(context).pop();
+              },
+              child: Text('Clear History'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
